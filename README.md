@@ -196,6 +196,102 @@ Essas limitações são comunicadas ao usuário com sugestões de alternativas v
 
 ---
 
+## Prompts de teste e cenários de validação
+
+Os cenários abaixo foram usados durante o desenvolvimento para validar o comportamento do sistema. Cada um exercita uma capacidade ou regra de qualidade específica. O painel **Events** do `adk web` permite inspecionar o caminho completo de cada resposta — qual agente atuou, quais tools foram chamadas e com quais argumentos.
+
+### 1. Saudação e conversa geral
+
+> `Bom dia, tudo bem?`
+
+AEST responde diretamente, sem acionar especialistas, e abre a coleta de perfil.
+
+*Valida:* o orquestrador não delega indiscriminadamente — conversa social fica no Lead Advisor.
+
+---
+
+### 2. Explicação de conceito (decisão de buscar ou não)
+
+> `O que é um FII?`
+>
+> `Qual a taxa Selic atual?`
+
+No primeiro caso, AEST delega ao AP (`quantum_researcher`), que responde do próprio conhecimento (conceito atemporal, sem chamar `google_search`). No segundo, o AP aciona `google_search` para trazer a Selic vigente com fonte explícita.
+
+*Valida:* o AP distingue conhecimento estático de informação dinâmica e usa busca web com parcimônia.
+
+---
+
+### 3. Cotação de ativo específico
+
+> `Qual a cotação da PETR4?`
+
+AEST delega ao AB3, que chama `get_stock_quote(ticker="PETR4")`. A resposta inclui o valor real e a **data de referência** explícita (ex: "dados de 21/05/2026"), comunicando defasagem quando ela existe.
+
+*Valida:* roteamento de dados de mercado para o especialista certo + transparência sobre frescor do dado.
+
+---
+
+### 4. Tradução de nome → ticker
+
+> `Qual o P/L e o dividend yield da Vale?`
+
+AB3 traduz "Vale" → `VALE3` e chama `get_fundamentals(ticker="VALE3")`. Retorna o P/L real (com data de referência trimestral CVM) e informa que o DY não está disponível no plano atual da base de dados — sem inventar valor.
+
+*Valida:* mapeamento empresa → ticker + comportamento honesto quando parte do dado solicitado não existe.
+
+---
+
+### 5. Robustez anti-alucinação (ticker inexistente)
+
+> `Qual o preço da ação ABCD9?`
+
+AB3 chama `get_stock_quote(ticker="ABCD9")`. A tool retorna erro/vazio. AB3 informa honestamente que o ticker não foi encontrado e sugere conferir o código — **em nenhum momento inventa um valor plausível**.
+
+*Valida:* o critério mais crítico do projeto — consultor financeiro nunca alucina dado de mercado, prefere admitir falha.
+
+---
+
+### 6. Recusa de recomendação sem perfil
+
+> `Você recomenda PETR4 pra mim?`
+
+AEST recusa a recomendação direta e solicita perfil (idade, objetivos, horizonte, tolerância a risco) antes de prosseguir. Nenhuma tool é acionada.
+
+*Valida:* a regra dos três níveis de recomendação — prescrição personalizada exige perfil.
+
+---
+
+### 7. Filtragem por critérios fundamentalistas (P/VP < 1 para FIIs)
+
+> `Liste FIIs com P/VP abaixo de 1`
+
+AEST delega ao AB3. O AB3 tenta primeiro `screen_stocks(metric="pvp", operator="lt", value=1)`, mas a tool retorna apenas ações (não cobre FIIs). Ativa então uma **estratégia alternativa**: chama `get_fii_details` em batch sobre a lista canônica de 14 FIIs (HGLG11, XPLG11, KNRI11, BRCO11, VILG11, VISC11, MALL11, HGRE11, JSRE11, KNCR11, RECR11, MXRF11, IRDM11, BCFF11), filtra localmente os que atendem ao critério, e devolve apenas os FIIs com P/VP < 1 e seus respectivos valores.
+
+*Valida:* dois critérios simultaneamente — (a) postura exploratória do agente (tentar estratégia B quando A não cobre o caso); (b) decomposição de problema (filtragem feita do lado do agente quando a tool não filtra).
+
+---
+
+### 8. Transparência sobre limitação + alternativas
+
+> `Me dá uma ação brasileira boa pagadora de dividendos hoje`
+
+AEST identifica que o pedido depende de Dividend Yield (não suportado no plano atual). Em vez de tentar delegar e voltar de mãos vazias, responde diretamente explicando a limitação e **oferece alternativas viáveis**: buscar fundamentos (P/L, ROE) de uma ação específica, comparar empresas em indicadores disponíveis, ou listar ações por outros critérios suportados.
+
+*Valida:* admitir o que não consegue fazer e converter a limitação em opções concretas para o usuário.
+
+---
+
+### 9. Composição multi-agente (conceito + dado real)
+
+> `Me explica o que é dividend yield e me dá exemplos de boas pagadoras`
+
+AEST delega ao AP para a definição conceitual. Em seguida, antecipa que "boas pagadoras" depende de DY (não suportado) e oferece alternativas: comparar fundamentos de empresas conhecidas via AB3, ou listar ações historicamente reconhecidas pelo pagamento de dividendos com seus indicadores disponíveis.
+
+*Valida:* coordenação entre especialistas no mesmo turno + transparência mantida mesmo em respostas compostas.
+
+---
+
 ## Próximos passos (roadmap)
 
 - **Persistência de perfil:** armazenar o perfil do cliente entre sessões (atualmente, ele é coletado a cada nova conversa).
