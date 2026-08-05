@@ -1,6 +1,7 @@
 # Quantum Finance Advisor
 
 > **EN** · Multi-agent financial advisory system for the Brazilian market. A Lead Advisor agent orchestrates two specialists — a web-research agent and a B3 market-data agent — via **Google ADK 2.x** using the AgentTool delegation pattern, with official market data served through **MCP** (Model Context Protocol). Design priorities: no hallucinated market data, graceful degradation on missing metrics, and CVM-compliant recommendation boundaries.
+*Educational project — not personalized investment advice (a CVM-regulated activity in Brazil).*
 
 Sistema multi-agente de consultoria financeira para o mercado brasileiro, construído com o **Google Agent Development Kit (ADK 2.x)** e integrado a dados oficiais da B3 via **MCP (Model Context Protocol)**.
 
